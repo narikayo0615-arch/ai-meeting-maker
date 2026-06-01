@@ -5,11 +5,11 @@ export const config = {
 };
 
 const members = [
-  { role: "リサーチ担当", instruction: "Web検索を使って事実ベースで調査し、分からないことは分からないと明記する。可能な範囲で根拠も書く" },
-  { role: "マーケター担当", instruction: "これまでの議論を踏まえて市場性・需要・売れる切り口を分析する" },
-  { role: "読者目線担当", instruction: "これまでの議論を踏まえて読者の興味・離脱ポイントを分析する" },
-  { role: "批判担当", instruction: "これまでの議論の弱点・矛盾・思い込みを厳しく指摘する" },
-  { role: "編集長", instruction: "全員の意見を統合し、最終結論をまとめる" },
+  { role: "リサーチ担当", instruction: "最新情報・事実ベース・不明は不明と明記" },
+  { role: "マーケター担当", instruction: "市場性・需要・売れる切り口を分析" },
+  { role: "読者目線担当", instruction: "読者の興味・離脱ポイントを分析" },
+  { role: "批判担当", instruction: "弱点・矛盾・リスクを指摘" },
+  { role: "編集長", instruction: "全体統合して結論" },
 ];
 
 export default async function handler(req, res) {
@@ -17,103 +17,63 @@ export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-cache");
 
   if (req.method !== "POST") {
-    res.status(405).end();
-    return;
+    return res.status(405).json({ error: "Method not allowed" });
   }
 
+  const { theme, apiKey } = req.body || {};
+
+  if (!theme || !apiKey) {
+    return res.status(400).json({
+      type: "error",
+      message: "テーマまたはAPIキーがありません"
+    });
+  }
+
+  const openai = new OpenAI({ apiKey });
+
+  let discussionHistory = "";
+
   try {
-    const { theme, apiKey } = req.body || {};
-
-    if (!theme || !apiKey) {
-      res.write(
-        JSON.stringify({
-          type: "error",
-          message: "テーマまたはAPIキーがありません。",
-        }) + "\n"
-      );
-      res.end();
-      return;
-    }
-
-    const openai = new OpenAI({ apiKey });
-
-    let discussionHistory = "";
-
     for (const m of members) {
-      let text = "";
-
-      if (m.role === "リサーチ担当") {
-        const response = await openai.responses.create({
-          model: "gpt-4.1-mini",
-          tools: [{ type: "web_search" }],
-          tool_choice: "auto",
-          input: `
-あなたはAI円卓会議のリサーチ担当です。
-必ずWeb検索を使える場合は使い、最新情報・事実・根拠を重視してください。
-不明なことは推測せず「分からない」と書いてください。
-
-会議テーマ
+      const response = await openai.chat.completions.create({
+        model: "gpt-4.1-mini",
+        messages: [
+          {
+            role: "system",
+            content:
+              m.role === "リサーチ担当"
+                ? "あなたは最新情報を調査するリサーチAIです。事実ベースで回答してください。"
+                : "あなたはAI円卓会議の参加者です。"
+          },
+          {
+            role: "user",
+            content: `
+テーマ:
 ${theme}
 
-これまでの議論
+これまでの議論:
 ${discussionHistory}
 
-あなたの役割
+役割:
 ${m.role}
 
-指示
+指示:
 ${m.instruction}
+`
+          }
+        ],
+      });
 
-発言してください。
-`,
-        });
+      const text =
+        response.choices?.[0]?.message?.content || "取得失敗";
 
-        text = response.output_text || "回答取得に失敗しました。";
-      } else {
-        const response = await openai.chat.completions.create({
-          model: "gpt-4.1-mini",
-          messages: [
-            {
-              role: "system",
-              content:
-                "あなたはAI円卓会議の参加者です。これまでの議論を読んで、自分の役割から意見を述べてください。",
-            },
-            {
-              role: "user",
-              content: `
-会議テーマ
-${theme}
-
-これまでの議論
-${discussionHistory}
-
-あなたの役割
-${m.role}
-
-指示
-${m.instruction}
-
-過去の発言を踏まえて発言してください。
-`,
-            },
-          ],
-        });
-
-        text =
-          response.choices?.[0]?.message?.content ||
-          "回答取得に失敗しました。";
-      }
-
-      discussionHistory += `
-【${m.role}】
-${text}
-`;
+      discussionHistory += `\n【${m.role}】\n${text}\n`;
 
       res.write(
         JSON.stringify({
           type: "log",
           role: m.role,
-          text,
+          text
         }) + "\n"
       );
 
@@ -121,7 +81,7 @@ ${text}
         res.write(
           JSON.stringify({
             type: "final_result",
-            text,
+            text
           }) + "\n"
         );
       }
@@ -129,13 +89,11 @@ ${text}
 
     res.write(JSON.stringify({ type: "done" }) + "\n");
     res.end();
+
   } catch (error) {
-    res.write(
-      JSON.stringify({
-        type: "error",
-        message: error.message || "AI会議の生成に失敗しました。",
-      }) + "\n"
-    );
-    res.end();
+    res.status(500).json({
+      type: "error",
+      message: error.message
+    });
   }
 }
