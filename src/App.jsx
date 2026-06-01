@@ -149,6 +149,111 @@ function App() {
     copyText(makeCopyText(history.theme, history.logs, history.finalResult || ""));
   };
 
+  const escapeHtml = (text) => {
+    return String(text || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  };
+
+  const savePdf = () => {
+    if (logs.length === 0) {
+      alert("PDF保存する会議結果がありません。");
+      return;
+    }
+
+    const printWindow = window.open("", "_blank");
+
+    if (!printWindow) {
+      alert("PDF保存画面を開けませんでした。ポップアップ許可を確認してください。");
+      return;
+    }
+
+    const logHtml = logs
+      .map(
+        (log) => `
+          <section class="log-section">
+            <h2>${escapeHtml(log.role)}</h2>
+            <p>${escapeHtml(log.text).replace(/\n/g, "<br />")}</p>
+          </section>
+        `
+      )
+      .join("");
+
+    printWindow.document.write(`
+      <!doctype html>
+      <html lang="ja">
+        <head>
+          <meta charset="UTF-8" />
+          <title>AI会議メーカー PDF</title>
+          <style>
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+              line-height: 1.8;
+              color: #222;
+              padding: 32px;
+            }
+            h1 {
+              font-size: 26px;
+              margin-bottom: 8px;
+            }
+            .date {
+              color: #666;
+              margin-bottom: 28px;
+            }
+            .theme,
+            .final,
+            .log-section {
+              border: 1px solid #ddd;
+              border-radius: 12px;
+              padding: 18px;
+              margin-bottom: 18px;
+            }
+            .final {
+              background: #fffaf0;
+            }
+            h2 {
+              font-size: 18px;
+              margin: 0 0 10px;
+            }
+            p {
+              white-space: normal;
+              margin: 0;
+            }
+          </style>
+        </head>
+        <body>
+          <h1>AI会議メーカー</h1>
+          <div class="date">${escapeHtml(new Date().toLocaleString("ja-JP"))}</div>
+
+          <section class="theme">
+            <h2>会議テーマ</h2>
+            <p>${escapeHtml(theme).replace(/\n/g, "<br />")}</p>
+          </section>
+
+          ${
+            finalResult
+              ? `
+                <section class="final">
+                  <h2>最終結果</h2>
+                  <p>${escapeHtml(finalResult).replace(/\n/g, "<br />")}</p>
+                </section>
+              `
+              : ""
+          }
+
+          ${logHtml}
+        </body>
+      </html>
+    `);
+
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+  };
+
   const handleVoiceInput = () => {
     const SpeechRecognition =
       window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -441,6 +546,11 @@ function App() {
                 <button className="start-button" onClick={copyResult}>
                   <span className="play-icon">📋</span>
                   <span><strong>全部コピー</strong><small>最終結果＋会議ログ</small></span>
+                </button>
+
+                <button className="start-button" onClick={savePdf}>
+                  <span className="play-icon">📄</span>
+                  <span><strong>PDF保存</strong><small>会議結果をPDFにする</small></span>
                 </button>
 
                 <button className="voice-button" onClick={openAllLogs}>
