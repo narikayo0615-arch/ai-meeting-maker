@@ -6,9 +6,7 @@ export const config = {
 
 const members = [
   { role: "リサーチ担当", instruction: "最新情報・事実ベース・不明は不明と明記" },
-  { role: "マーケター担当", instruction: "市場性・需要・売れる切り口を分析" },
-  { role: "読者目線担当", instruction: "読者の興味・離脱ポイントを分析" },
-  { role: "批判担当", instruction: "弱点・矛盾・リスクを指摘" },
+ 
   { role: "編集長", instruction: "全体統合して結論" },
 ];
 
