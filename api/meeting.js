@@ -1,5 +1,9 @@
 import OpenAI from "openai";
 
+export const config = {
+  maxDuration: 60,
+};
+
 const members = [
   { role: "リサーチ担当", instruction: "新規性と事実ベースで具体的に出す" },
   { role: "マーケター担当", instruction: "市場性と刺さる切り口を出す" },
@@ -9,48 +13,95 @@ const members = [
 ];
 
 export default async function handler(req, res) {
-  res.setHeader("Content-Type", "application/x-ndjson");
+  res.setHeader("Content-Type", "application/x-ndjson; charset=utf-8");
+  res.setHeader("Cache-Control", "no-cache");
 
-  const { theme, apiKey } = req.body;
-
-  const openai = new OpenAI({ apiKey });
-
-  for (const m of members) {
-    const r = await openai.chat.completions.create({
-      model: "gpt-4.1-mini",
-      response_format: { type: "json_object" },
-      messages: [
-        {
-          role: "system",
-          content: "実用企画会議AI。具体的に出す。",
-        },
-        {
-          role: "user",
-          content: `テーマ:${theme}\n役割:${m.role}\n指示:${m.instruction}`,
-        },
-      ],
-    });
-
-    const content = JSON.parse(r.choices[0].message.content);
-
-    res.write(
+  if (req.method !== "POST") {
+    res.status(405).end(
       JSON.stringify({
-        type: "log",
-        role: m.role,
-        text: content.text || "",
+        type: "error",
+        message: "POSTメソッドのみ対応しています。",
       }) + "\n"
     );
-
-    if (m.role === "編集長") {
-      res.write(
-        JSON.stringify({
-          type: "final_result",
-          text: content.text,
-        }) + "\n"
-      );
-    }
+    return;
   }
 
-  res.write(JSON.stringify({ type: "done" }) + "\n");
-  res.end();
+  try {
+    const { theme, apiKey } = req.body || {};
+
+    if (!theme || !apiKey) {
+      res.write(
+        JSON.stringify({
+          type: "error",
+          message: "テーマまたはAPIキーがありません。",
+        }) + "\n"
+      );
+      res.end();
+      return;
+    }
+
+    const openai = new OpenAI({ apiKey });
+
+    for (const m of members) {
+      res.write(
+        JSON.stringify({
+          type: "status",
+          role: m.role,
+        }) + "\n"
+      );
+
+      const r = await openai.chat.completions.create({
+        model: "gpt-4.1-mini",
+        response_format: { type: "json_object" },
+        messages: [
+          {
+            role: "system",
+            content:
+              'あなたは実用企画会議AIです。必ずJSON形式で返してください。形式は {"text":"ここに回答"} のみです。',
+          },
+          {
+            role: "user",
+            content: `テーマ:${theme}\n役割:${m.role}\n指示:${m.instruction}\n\n必ず {"text":"回答本文"} のJSONだけで返してください。`,
+          },
+        ],
+      });
+
+      let text = "";
+
+      try {
+        const content = JSON.parse(r.choices[0].message.content || "{}");
+        text = content.text || "";
+      } catch {
+        text = r.choices[0].message.content || "";
+      }
+
+      res.write(
+        JSON.stringify({
+          type: "log",
+          role: m.role,
+          text,
+        }) + "\n"
+      );
+
+      if (m.role === "編集長") {
+        res.write(
+          JSON.stringify({
+            type: "final_result",
+            text,
+          }) + "\n"
+        );
+      }
+    }
+
+    res.write(JSON.stringify({ type: "done" }) + "\n");
+    res.end();
+  } catch (error) {
+    res.write(
+      JSON.stringify({
+        type: "error",
+        message: error.message || "AI会議の生成に失敗しました。",
+      }) + "\n"
+    );
+    res.end();
+  }
 }
