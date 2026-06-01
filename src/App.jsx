@@ -316,7 +316,7 @@ function App() {
     let latestFinalResult = "";
 
     try {
-      const response = await fetch("http://localhost:3001/api/meeting", {
+      const response = await fetch("/api/meeting", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ theme, apiKey: savedApiKey.trim() }),
