@@ -408,3 +408,8 @@ button small {
     opacity: 0.55;
   }
 }
+.log-item p {
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
