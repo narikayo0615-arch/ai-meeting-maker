@@ -384,7 +384,7 @@ function App() {
     } catch (error) {
       console.error(error);
       setErrorMessage(
-        "AI会議の生成に失敗しました。APIキー、または server.js の起動を確認してください。"
+        "AI会議の生成に失敗しました。APIキーが正しいか確認してください。"
       );
     } finally {
       setIsMeeting(false);
