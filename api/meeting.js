@@ -35,6 +35,7 @@ export default async function handler(req, res) {
       return;
     }
 
+    const today = new Date().toLocaleDateString("ja-JP", { year: "numeric", month: "long", day: "numeric" });
     const openai = new OpenAI({ apiKey });
 
     let discussionHistory = "";
@@ -51,6 +52,9 @@ export default async function handler(req, res) {
           {
             role: "user",
             content: `
+今日の日付：${today}
+※「最新」「最近」「現在」はこの日付を基準にしてください。
+
 会議テーマ
 ${theme}
 
@@ -108,4 +112,3 @@ ${text}
     res.end();
   }
 }
-
