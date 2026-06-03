@@ -1,7 +1,7 @@
 import OpenAI from "openai";
 
 export const config = {
-  maxDuration: 60,
+  maxDuration: 300,
 };
 
 const members = [
